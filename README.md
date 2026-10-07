@@ -1,6 +1,17 @@
-# Sprinter Credit demo
+# Sprinter Playground
 
-A React demo of the [Sprinter Credit API](https://docs.sprinter.tech/api-reference/sprinter/credit/overview): **lock collateral → draw credit → repay debt → unlock collateral**.
+An outcome-focused React playground for Sprinter. Start with a goal, adjust an example amount, and follow a visual journey:
+
+- **Put liquidity to work:** USDC supply, pooled capital, cross-chain activity, and settlement.
+- **Access spending money:** collateral, borrowing capacity, a credit draw, and repayment.
+- **Power a spending app:** customer collateral, a credit line, an example purchase, and repayment.
+- **Complete cross-chain transfers:** a customer request, operator liquidity, delivery, and settlement.
+
+These four journeys are explicitly labeled simulations. They never request a wallet, call live APIs, move funds, calculate actual yields, or claim current route availability. Example borrowing uses a fixed 70% limit; actual limits, costs, and supported networks come from the protocol.
+
+**Live Credit demo** opens the original working [Sprinter Credit API](https://docs.sprinter.tech/api-reference/sprinter/credit/overview) workspace: **lock collateral → draw credit → repay debt → unlock collateral**. It is loaded only when requested. Leaving the workspace is disabled during transaction execution.
+
+The Liquidity walkthrough is grounded in [Sprinter Liquidity](https://docs.sprinter.tech/stash-v1/overview), the holder journey in [wallet integration](https://docs.sprinter.tech/quickstart/wallets-integration), the spending journey in [card programs](https://docs.sprinter.tech/quickstart/card-program), and the operator journey in the [Liquidity integration guide](https://docs.sprinter.tech/stash-v1/integration-guide). LP deposits, actual cards, and solver fills are not implemented by the Credit API workspace.
 
 ## Run locally
 
@@ -19,7 +30,9 @@ npm run build    # production output in dist/
 npm run preview  # serve the production build locally
 ```
 
-## Try the basic flow
+## Try the live Credit flow
+
+Open **Live Credit demo** from the playground.
 
 1. Enter a valid EVM account address to inspect it, or connect an injected Ethereum wallet (such as MetaMask).
 2. Select a network and credit asset from the live protocol configuration. The current API advertises Base and USDC.
@@ -50,6 +63,6 @@ Protocol configuration provides networks, credit hubs, collateral, LTVs, and ear
 
 ## Validation and limitations
 
-Tests cover input validation, exact V2 routes, large integer amounts, API errors, stale previews, wallet changes, chain switching, sequential confirmation, reverted approvals, and timeouts. Live protocol, account-info, and unsigned lock requests were checked during development. No real transaction was signed or broadcast during verification; funded-wallet end-to-end testing remains a manual step.
+Tests verify that simulations make no network or wallet requests, borrowing and repayment update the example balances, and changes restart the journey. Credit tests cover input validation, exact V2 routes, large integer amounts, API errors, stale previews, wallet changes, chain switching, sequential confirmation, reverted approvals, and timeouts. Live protocol, account-info, and unsigned lock requests were checked during development. No real transaction was signed or broadcast during verification; funded-wallet end-to-end testing remains a manual step.
 
 See [AUDIT.md](./AUDIT.md) for findings and resolution.

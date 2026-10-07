@@ -1,647 +1,356 @@
-import React, { useEffect, useRef, useState } from "react";
-import {
-  actionRequest,
-  executeCalls,
-  isAddress,
-  normalizeCalls,
-  request,
-} from "./credit";
+import React, { lazy, Suspense, useState } from "react";
+import { journeys, journeyMetrics, formatMoney } from "./journeys";
 import "./index.css";
+import "./explorer.css";
+const CreditWorkspace = lazy(() => import("./CreditWorkspace"));
 
-const actions = {
-  lock: [
-    "Lock collateral",
-    "Deposit a supported asset to open or increase your credit capacity.",
-  ],
-  draw: [
-    "Draw credit",
-    "Borrow against your collateral and send funds to your receiver.",
-  ],
-  repay: ["Repay debt", "Repay borrowed credit and accrued interest."],
-  unlock: [
-    "Unlock collateral",
-    "Withdraw collateral when your remaining position allows it.",
-  ],
-};
-const blankForm = {
-  amount: "",
-  collateral: "",
-  receiver: "",
-  earn: "",
-  unwrap: false,
-};
-const metricLabels = {
-  totalCollateralValue: "Collateral value",
-  remainingCreditCapacity: "Available credit",
-  debt: "Total debt",
-  healthFactor: "Health factor",
-  totalCreditCapacity: "Credit capacity",
-  interest: "Accrued interest",
-  principal: "Principal",
-  liquidationLimit: "Liquidation limit",
-  mHealthFactor: "Maintenance health factor",
-};
+function FlowMap({ id, step, amount }) {
+  const lending = id === "liquidity" || id === "operator";
+  return (
+    <div
+      className={`flow-map phase-${step}`}
+      aria-label="Illustrative capital flow"
+    >
+      <div className="map-caption">
+        <span className="status-dot" />
+        ILLUSTRATIVE JOURNEY <span>0{step + 1} / 04</span>
+      </div>
+      <div className="flow-source">
+        <span className="node-icon">{lending ? "◈" : "▣"}</span>
+        <div>
+          <small>
+            {id === "operator"
+              ? "Customer request"
+              : id === "card"
+                ? "Customer assets"
+                : "You start with"}
+          </small>
+          <strong>{formatMoney(amount)}</strong>
+          <span>{lending ? "USDC" : "Collateral value"}</span>
+        </div>
+        <span className="flow-check">{step > 0 ? "✓" : "01"}</span>
+      </div>
+      <div className={`flow-connector ${step > 0 ? "lit" : ""}`}>
+        <span>↓</span>
+        <small>
+          {lending ? "Capital joins the network" : "Assets back a credit line"}
+        </small>
+      </div>
+      <div className={`flow-hub ${step > 0 ? "lit" : ""}`}>
+        <div className="hub-logo">↗</div>
+        <div>
+          <strong>sprinter</strong>
+          <span>{lending ? "Shared liquidity" : "Your credit line"}</span>
+        </div>
+        <span className="hub-state">
+          {step === 3 ? "Cycle complete" : step > 0 ? "In motion" : "Ready"}
+        </span>
+      </div>
+      <div className={`flow-connector branching ${step > 1 ? "lit" : ""}`}>
+        <span>↓</span>
+        <small>
+          {lending
+            ? "Liquidity goes where it is needed"
+            : "USDC goes where you choose"}
+        </small>
+      </div>
+      {lending ? (
+        <div className="network-row">
+          {["Base", "Arbitrum", "Optimism"].map((name, index) => (
+            <div
+              key={name}
+              className={`network-node ${step > 1 && (id === "liquidity" || index === 1) ? "lit" : ""}`}
+            >
+              <span className={`chain-symbol chain-${index}`}>
+                {index === 0 ? "—" : index === 1 ? "A" : "O"}
+              </span>
+              <strong>{name}</strong>
+              <small>
+                {step === 3
+                  ? "Settled"
+                  : step > 1
+                    ? "Transfer activity"
+                    : "Example network"}
+              </small>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className={`spending-node ${step > 1 ? "lit" : ""}`}>
+          <span>{id === "card" ? "▰" : "↗"}</span>
+          <div>
+            <strong>
+              {id === "card" ? "Everyday spending" : "Your wallet or recipient"}
+            </strong>
+            <small>
+              {step === 2
+                ? id === "card"
+                  ? "$25 example purchase"
+                  : `${formatMoney(Math.round(amount * 0.3))} example credit draw`
+                : step === 3
+                  ? "Debt repaid · collateral releasable"
+                  : "USDC available after borrowing"}
+            </small>
+          </div>
+        </div>
+      )}
+      <div className={`cycle-note ${step === 3 ? "lit" : ""}`}>
+        <span>↻</span>
+        {lending
+          ? "Settlement returns capital to the pool"
+          : "Repayment makes collateral available again"}
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
-  const [protocol, setProtocol] = useState(null);
-  const [protocolError, setProtocolError] = useState("");
-  const [reload, setReload] = useState(0);
-  const [chain, setChain] = useState("");
-  const [asset, setAsset] = useState("");
-  const [account, setAccount] = useState("");
-  const [wallet, setWallet] = useState("");
-  const [connecting, setConnecting] = useState(false);
-  const [info, setInfo] = useState(null);
-  const [infoState, setInfoState] = useState("");
-  const [action, setAction] = useState("lock");
-  const [form, setForm] = useState(blankForm);
-  const [plan, setPlan] = useState(null);
-  const [building, setBuilding] = useState(false);
-  const [executing, setExecuting] = useState(false);
-  const [attempted, setAttempted] = useState(false);
-  const [progress, setProgress] = useState({});
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const version = useRef(0);
-  const mounted = useRef(true);
-  const executingRef = useRef(false);
-  const config = protocol?.chains?.[chain];
-  const position = info?.[asset];
-  const collateral = Object.entries(config?.collateral || {});
-  const strategies = Object.entries(config?.strategies || {});
-  const invalidate = () => {
-    version.current += 1;
-    setPlan(null);
-    setAttempted(false);
-    setBuilding(false);
-    setError("");
-    setNotice("");
-  };
-
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-      version.current += 1;
-    };
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setProtocolError("");
-    request("/credit/protocol", {}, controller.signal)
-      .then((data) => {
-        if (!data.chains || !Object.keys(data.chains).length)
-          throw new Error("No supported credit networks returned.");
-        setProtocol(data);
-        setChain((current) =>
-          data.chains[current] ? current : Object.keys(data.chains)[0],
-        );
-      })
-      .catch((err) => {
-        if (!controller.signal.aborted) setProtocolError(err.message);
-      });
-    return () => controller.abort();
-  }, [reload]);
-
-  useEffect(() => {
-    setAsset(Object.keys(config?.creditHubs || {})[0] || "");
-    setForm((current) => ({
-      ...current,
-      collateral:
-        Object.keys(config?.collateral || {})[0]?.replace(/^erc20:/, "") || "",
-      earn: "",
-    }));
-  }, [config]);
-
-  useEffect(() => {
-    const provider = window.ethereum;
-    if (!provider?.on) return;
-    const changed = (accounts) => {
-      version.current += 1;
-      setWallet(accounts[0] || "");
-      setAccount(accounts[0] || "");
-      setPlan(null);
-      setBuilding(false);
-      if (executingRef.current)
-        setError(
-          "Wallet changed during execution. Check transaction history before continuing.",
-        );
-    };
-    const disconnected = () => changed([]);
-    provider.on("accountsChanged", changed);
-    provider.on("disconnect", disconnected);
-    return () => {
-      provider.removeListener?.("accountsChanged", changed);
-      provider.removeListener?.("disconnect", disconnected);
-    };
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    setInfo(null);
-    if (!isAddress(account)) {
-      setInfoState(
-        "Enter an account or connect your wallet to view your position.",
-      );
-      return;
-    }
-    setInfoState("Loading credit position…");
-    request(`/credit/accounts/${account}/info`, {}, controller.signal)
-      .then((data) => {
-        if (!data.data || typeof data.data !== "object")
-          throw new Error("Invalid account response.");
-        setInfo(data.data);
-        setInfoState("");
-      })
-      .catch((err) => {
-        if (!controller.signal.aborted)
-          setInfoState(`Could not load position: ${err.message}`);
-      });
-    return () => controller.abort();
-  }, [account, reload]);
-
-  async function connect() {
-    setError("");
-    setConnecting(true);
-    try {
-      if (!window.ethereum)
-        throw new Error(
-          "Install an Ethereum wallet extension to connect and sign transactions.",
-        );
-      const accounts = await window.ethereum.request({
-        method: "eth_requestAccounts",
-      });
-      if (!isAddress(accounts[0]))
-        throw new Error("No wallet account was selected.");
-      invalidate();
-      setWallet(accounts[0]);
-      setAccount(accounts[0]);
-      setForm((current) => ({ ...current, receiver: accounts[0] }));
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setConnecting(false);
-    }
+  const [mode, setMode] = useState("explore");
+  const [busy, setBusy] = useState(false);
+  const [selected, setSelected] = useState("liquidity");
+  const [step, setStep] = useState(0);
+  const [amount, setAmount] = useState(10000);
+  const journey = journeys[selected];
+  function choose(id) {
+    setSelected(id);
+    setStep(0);
   }
-
-  function update(field, value) {
-    invalidate();
-    setForm((current) => ({
-      ...current,
-      [field]: value,
-      ...(field === "collateral" ? { earn: "" } : {}),
-    }));
-  }
-
-  async function build(event) {
-    event.preventDefault();
-    invalidate();
-    const currentVersion = version.current;
-    try {
-      if (!config?.creditHubs?.[asset])
-        throw new Error("Select a supported credit asset.");
-      const { path, params } = actionRequest(account, asset, action, form);
-      setBuilding(true);
-      const calls = normalizeCalls(await request(path, params));
-      if (currentVersion !== version.current || !mounted.current) return;
-      if (calls.some((call) => `eip155:${call.chain}` !== chain))
-        throw new Error(
-          "API returned calls for a different network. Select the matching network and rebuild.",
-        );
-      setPlan({ calls, action, account, created: Date.now() });
-      setProgress({});
-      if (!calls.length)
-        setNotice("No transactions are needed for this request.");
-    } catch (err) {
-      if (currentVersion === version.current && mounted.current)
-        setError(err.message);
-    } finally {
-      if (currentVersion === version.current && mounted.current)
-        setBuilding(false);
-    }
-  }
-
-  async function execute() {
-    if (!plan || attempted || executingRef.current) return;
-    if (Date.now() - plan.created > 120000) {
-      setError("This request is over two minutes old. Build a fresh request.");
-      setPlan(null);
-      return;
-    }
-    if (wallet.toLowerCase() !== plan.account.toLowerCase()) {
-      setError("Connect the wallet for this account before executing.");
-      return;
-    }
-    setAttempted(true);
-    setExecuting(true);
-    executingRef.current = true;
-    setError("");
-    setNotice("");
-    try {
-      await executeCalls(window.ethereum, plan.account, plan.calls, (item) => {
-        if (mounted.current)
-          setProgress((current) => ({ ...current, [item.index]: item }));
-      });
-      setNotice(
-        "All transactions confirmed on the source network. Refresh your position to see the latest state.",
-      );
-      setReload((value) => value + 1);
-    } catch (err) {
-      setError(
-        `${err.message} Any confirmed transactions remain completed. Review the hashes below before building a new request.`,
-      );
-    } finally {
-      setExecuting(false);
-      executingRef.current = false;
-    }
-  }
-
+  if (mode === "live")
+    return (
+      <>
+        <div className="mode-return">
+          <button
+            className="subtle"
+            disabled={busy}
+            onClick={() => setMode("explore")}
+          >
+            ← Back to use cases
+          </button>
+          <span>Live Credit workspace · real wallet transactions</span>
+        </div>
+        <Suspense
+          fallback={
+            <p className="mode-return" role="status">
+              Opening live Credit tools…
+            </p>
+          }
+        >
+          <CreditWorkspace onBusyChange={setBusy} />
+        </Suspense>
+      </>
+    );
   return (
-    <main>
-      <header>
+    <main className="explorer">
+      <header className="explorer-header">
         <a
           className="brand"
           href="https://sprinter.tech"
           target="_blank"
           rel="noreferrer"
         >
-          <span className="brand-mark">↗</span> sprinter
-          <span className="tag">CREDIT DEMO</span>
+          <span className="brand-mark">↗</span>sprinter
+          <span className="tag">PLAYGROUND</span>
         </a>
-        <a
-          href="https://docs.sprinter.tech/api-reference/sprinter/credit/overview"
-          target="_blank"
-          rel="noreferrer"
-        >
-          API documentation ↗
-        </a>
-      </header>
-      <section className="intro">
-        <p className="eyebrow">YOUR ASSETS. MORE POSSIBILITIES.</p>
-        <h1>
-          Put your collateral
-          <br />
-          to work.
-        </h1>
-        <p>
-          Explore the complete Sprinter Credit lifecycle.
-          <br />
-          Lock assets, access credit, and manage your position.
-        </p>
-      </section>
-      <section className="panel account-panel" aria-label="Account connection">
-        <div>
-          <h2>Your credit account</h2>
-          <p>Inspect any address. Connect its wallet to sign transactions.</p>
-        </div>
-        <button
-          type="button"
-          onClick={connect}
-          disabled={executing || connecting}
-        >
-          {connecting
-            ? "Connecting…"
-            : wallet
-              ? "Reconnect wallet"
-              : "Connect wallet"}
-        </button>
-        <label className="wide">
-          Account address
-          <input
-            placeholder="0x…"
-            value={account}
-            disabled={executing}
-            onChange={(event) => {
-              invalidate();
-              setAccount(event.target.value.trim());
-            }}
-          />
-        </label>
-        <div className="selectors">
-          <label>
-            Network
-            <select
-              value={chain}
-              disabled={executing || !protocol}
-              onChange={(event) => {
-                invalidate();
-                setChain(event.target.value);
-              }}
-            >
-              {Object.keys(protocol?.chains || {}).map((id) => (
-                <option key={id} value={id}>
-                  {id === "eip155:8453" ? "Base" : id}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Credit asset
-            <select
-              value={asset}
-              disabled={executing || !config}
-              onChange={(event) => {
-                invalidate();
-                setAsset(event.target.value);
-              }}
-            >
-              {Object.keys(config?.creditHubs || {}).map((symbol) => (
-                <option key={symbol} value={symbol}>
-                  {symbol.toUpperCase()}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        {protocolError && (
-          <p role="alert">
-            Protocol unavailable: {protocolError}{" "}
-            <button onClick={() => setReload((n) => n + 1)}>Retry</button>
-          </p>
-        )}
-        {!protocol && !protocolError && (
-          <p role="status">Loading protocol configuration…</p>
-        )}
-      </section>
-      <section className="position" aria-label="Credit position">
-        <div className="section-heading">
-          <h2>Position overview</h2>
-          <button
-            className="subtle"
-            disabled={executing || !isAddress(account)}
-            onClick={() => {
-              invalidate();
-              setReload((n) => n + 1);
-            }}
-          >
-            Refresh
+        <nav aria-label="Main navigation">
+          <a href="#journey">Explore use cases</a>
+          <button className="subtle" onClick={() => setMode("live")}>
+            Live Credit demo ↗
           </button>
+        </nav>
+      </header>
+      <section className="explorer-hero">
+        <div>
+          <p className="eyebrow">A LITTLE CAPITAL. MORE POSSIBILITIES.</p>
+          <h1>
+            What could you
+            <br />
+            do with <span>Sprinter?</span>
+          </h1>
+          <p>
+            Put liquidity to work. Access credit. Build a better spending
+            experience. Pick a goal and see how it plays out.
+          </p>
+          <a className="hero-link" href="#journey">
+            Find your use case <span>↓</span>
+          </a>
         </div>
-        <div className="metrics">
-          {Object.entries(metricLabels)
-            .slice(0, 4)
-            .map(([key, title]) => (
-              <div className="metric" key={key}>
-                <span>{title}</span>
-                <strong>
-                  {position
-                    ? key === "healthFactor" && position.debt === "0"
-                      ? "No debt"
-                      : (position[key] ?? "—")
-                    : "—"}
-                </strong>
-                <small>
-                  {key === "healthFactor"
-                    ? "Liquidation safety"
-                    : asset.toUpperCase() || "Credit asset"}
-                </small>
-              </div>
-            ))}
-        </div>
-        {infoState && <p role="status">{infoState}</p>}
-        {info && !position && (
-          <p>No position returned for the selected credit asset.</p>
-        )}
-        {position && (
-          <details>
-            <summary>Position details</summary>
-            <dl>
-              {Object.entries(metricLabels)
-                .slice(4)
-                .map(([key, label]) => (
-                  <React.Fragment key={key}>
-                    <dt>{label}</dt>
-                    <dd>{position[key] ?? "—"}</dd>
-                  </React.Fragment>
-                ))}
-              <dt>Due date</dt>
-              <dd>
-                {position.debt === "0"
-                  ? "No active debt"
-                  : position.dueDate || "Not available"}
-              </dd>
-            </dl>
-          </details>
-        )}
-      </section>
-      <section className="panel action-panel">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">THE CREDIT LIFECYCLE</p>
-            <h2>Manage your credit</h2>
+        <aside className="hero-note">
+          <div className="orbit-art" aria-hidden="true">
+            <div className="orbit-ring ring-1" />
+            <div className="orbit-ring ring-2" />
+            <span className="orbit-center">↗</span>
+            <span className="orbit-point point-1">Liquidity</span>
+            <span className="orbit-point point-2">Credit</span>
+            <span className="orbit-point point-3">Possibility</span>
           </div>
-          <span className="live-dot">Live API</span>
+          <span className="simulation-pill">
+            Interactive walkthrough · no wallet needed
+          </span>
+        </aside>
+      </section>
+      <section
+        id="journey"
+        className="journey-picker"
+        aria-label="Choose your goal"
+      >
+        <div className="section-heading">
+          <h2>Start with what you want to do.</h2>
+          <span>01 — CHOOSE YOUR GOAL</span>
         </div>
-        <div className="tabs" role="group" aria-label="Credit action">
-          {Object.entries(actions).map(([key, [title]], index) => (
+        <div className="persona-grid">
+          {Object.entries(journeys).map(([id, item]) => (
             <button
-              type="button"
-              key={key}
-              disabled={executing}
-              aria-pressed={action === key}
-              className={action === key ? "active" : ""}
-              onClick={() => {
-                invalidate();
-                setAction(key);
-                setForm((current) => ({
-                  ...current,
-                  amount: "",
-                  earn: "",
-                  unwrap: false,
-                }));
-              }}
+              key={id}
+              aria-pressed={selected === id}
+              className={`persona-card ${selected === id ? "selected" : ""}`}
+              onClick={() => choose(id)}
             >
-              <span>0{index + 1}</span>
-              {title}
+              <span className="persona-top">
+                <span className="persona-icon">{item.icon}</span>
+                <span className="persona-arrow">↗</span>
+              </span>
+              <strong>{item.label}</strong>
+              <small>{item.audience}</small>
+              <span className="persona-product">{item.product}</span>
             </button>
           ))}
         </div>
-        <form onSubmit={build}>
-          <p>{actions[action][1]}</p>
-          <fieldset disabled={executing || !config}>
-            {(action === "lock" || action === "unlock") && (
-              <label>
-                Collateral asset
-                <select
-                  value={form.collateral}
-                  onChange={(event) => update("collateral", event.target.value)}
-                >
-                  {collateral.map(([id, value]) => (
-                    <option key={id} value={id.replace(/^erc20:/, "")}>
-                      {value.symbol} · {Number(value.ltv) / 100}% LTV
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-            <label>
-              Amount in base units
-              <input
-                aria-label="Amount in base units"
-                inputMode="numeric"
-                placeholder="e.g. 1000000"
-                value={form.amount}
-                onChange={(event) => update("amount", event.target.value)}
-                required
-              />
-              <small>
-                Use the token’s smallest denomination. For USDC, 1 USDC =
-                1,000,000 base units. Vault shares may use different decimals.
-              </small>
-            </label>
-            {action === "lock" && (
-              <label>
-                Earn strategy (optional)
-                <select
-                  value={form.earn}
-                  onChange={(event) => update("earn", event.target.value)}
-                >
-                  <option value="">Deposit selected asset directly</option>
-                  {strategies
-                    .filter(
-                      ([, value]) =>
-                        value.underlyingAddress?.toLowerCase() ===
-                        form.collateral.toLowerCase(),
-                    )
-                    .map(([id, value]) => (
-                      <option key={id} value={id}>
-                        {value.name}
-                      </option>
-                    ))}
-                </select>
-                <small>
-                  Select a strategy only when depositing its underlying token.
-                </small>
-              </label>
-            )}
-            {action === "draw" && (
-              <label>
-                Receiver address
-                <input
-                  placeholder="0x…"
-                  value={form.receiver}
-                  onChange={(event) =>
-                    update("receiver", event.target.value.trim())
-                  }
-                  required
-                />
-              </label>
-            )}
-            {action === "unlock" && (
-              <label className="checkbox">
-                <input
-                  type="checkbox"
-                  checked={form.unwrap}
-                  onChange={(event) => update("unwrap", event.target.checked)}
-                />{" "}
-                Unwrap from the earn vault on withdrawal
-              </label>
-            )}
-            <button
-              className="primary"
-              disabled={building || !isAddress(account)}
+      </section>
+      <section
+        className="journey-stage"
+        aria-label={`${journey.audience} walkthrough`}
+      >
+        <div className="journey-heading">
+          <div>
+            <p className="eyebrow">
+              {journey.product} / {journey.audience}
+            </p>
+            <h2>{journey.title}</h2>
+            <p>{journey.description}</p>
+          </div>
+          <span className="simulation-pill">Simulation</span>
+        </div>
+        <div className="journey-content">
+          <div className="journey-controls">
+            <div
+              className="step-switcher"
+              role="group"
+              aria-label="Journey steps"
             >
-              {building
-                ? "Building transactions…"
-                : "Build transaction preview →"}
+              {journey.steps.map((label, index) => (
+                <button
+                  key={label}
+                  aria-pressed={step === index}
+                  className={`${step === index ? "current" : ""} ${step > index ? "complete" : ""}`}
+                  onClick={() => setStep(index)}
+                >
+                  <span>{step > index ? "✓" : index + 1}</span>
+                  <small>{label}</small>
+                </button>
+              ))}
+            </div>
+            <div className="story" key={`${selected}-${step}`}>
+              <span className="chapter">STEP 0{step + 1}</span>
+              <h3>{journey.headings[step]}</h3>
+              <p aria-live="polite">{journey.stories[step]}</p>
+            </div>
+            <div className="amount-control">
+              <label htmlFor="example-amount">
+                {journey.input}
+                <output htmlFor="example-amount">{formatMoney(amount)}</output>
+              </label>
+              <input
+                id="example-amount"
+                type="range"
+                min="1000"
+                max="100000"
+                step="1000"
+                value={amount}
+                onChange={(event) => {
+                  setAmount(Number(event.target.value));
+                  setStep(0);
+                }}
+              />
+              <div>
+                <span>$1,000</span>
+                <span>$100,000</span>
+              </div>
+            </div>
+            <button
+              className="primary journey-next"
+              onClick={() => setStep((current) => (current + 1) % 4)}
+            >
+              {journey.buttons[step]}
+              <span>{step === 3 ? "↻" : "→"}</span>
             </button>
-          </fieldset>
-        </form>
-        {error && (
-          <p className="message error" role="alert">
-            {error}
-          </p>
-        )}
-        {notice && (
-          <p className="message" role="status">
-            {notice}
-          </p>
-        )}
-        {plan && (
-          <section className="preview" aria-label="Transaction preview">
-            <h3>
-              {actions[plan.action][0]} · {plan.calls.length} transaction
-              {plan.calls.length === 1 ? "" : "s"}
-            </h3>
-            <p>
-              Review each call below. Your wallet will request signatures in
-              order, waiting for confirmation after each transaction.
+            <p className="simulation-explainer">
+              Example only. No funds move and no wallet connects.
             </p>
-            <ol>
-              {plan.calls.map((call, index) => (
-                <li key={index}>
-                  <strong>
-                    Call {index + 1} · Chain {call.chain}
-                  </strong>
-                  <dl>
-                    <dt>To</dt>
-                    <dd>
-                      <code>{call.to}</code>
-                    </dd>
-                    <dt>Native value (wei)</dt>
-                    <dd>{call.value}</dd>
-                  </dl>
-                  <details>
-                    <summary>Calldata</summary>
-                    <code>{call.data}</code>
-                  </details>
-                  {progress[index] && (
-                    <p role="status">
-                      {progress[index].state}
-                      {progress[index].hash && (
-                        <>
-                          {" "}
-                          · <code>{progress[index].hash}</code>
-                        </>
-                      )}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ol>
-            {plan.calls.length > 0 && (
-              <button
-                className="primary"
-                disabled={
-                  executing ||
-                  attempted ||
-                  wallet.toLowerCase() !== plan.account.toLowerCase()
-                }
-                onClick={execute}
-              >
-                {executing
-                  ? "Waiting for wallet / confirmation…"
-                  : attempted
-                    ? "Request already attempted — rebuild to continue"
-                    : "Sign and execute in wallet"}
-              </button>
-            )}
-            {!wallet && (
-              <p>Connect this account’s wallet to execute the preview.</p>
-            )}
-          </section>
-        )}
-        {Object.values(progress).some((item) => item.hash) && (
-          <section aria-label="Transaction history">
-            <h3>Transaction history</h3>
-            <p>
-              Keep these hashes to check any pending or completed calls before
-              starting again.
-            </p>
-            {Object.values(progress)
-              .filter((item) => item.hash)
-              .map((item) => (
-                <p className="history" key={item.index}>
-                  Call {item.index + 1}: {item.state} · <code>{item.hash}</code>
-                </p>
-              ))}
-          </section>
-        )}
+          </div>
+          <FlowMap id={selected} step={step} amount={amount} />
+        </div>
+        <div
+          className="journey-metrics"
+          role="region"
+          aria-label="Example outcome"
+        >
+          {journeyMetrics(selected, step, amount).map(
+            ([title, value, description]) => (
+              <div key={title}>
+                <span>{title}</span>
+                <strong>{value}</strong>
+                <small>{description}</small>
+              </div>
+            ),
+          )}
+        </div>
+        <div className="journey-assumption">
+          <span>ⓘ</span>
+          <p>{journey.note}</p>
+        </div>
+      </section>
+      <section className="outcome-section">
+        <div>
+          <p className="eyebrow">WHAT CHANGES FOR YOU</p>
+          <h2>{journey.outcome}</h2>
+          <p>{journey.who}</p>
+          <a href={journey.source} target="_blank" rel="noreferrer">
+            Read about this use case ↗
+          </a>
+        </div>
+        <div className="next-step-card">
+          <span className="eyebrow">TAKE THE NEXT STEP</span>
+          <h3>
+            {selected === "borrower" || selected === "card"
+              ? "Try the real Credit flow."
+              : "Explore the liquidity model."}
+          </h3>
+          <p>
+            {selected === "borrower" || selected === "card"
+              ? "The live workspace lets you inspect an account and review Credit actions before signing."
+              : "This walkthrough explains the idea. Liquidity deposits and operator fills are not connected in this playground."}
+          </p>
+          {selected === "borrower" || selected === "card" ? (
+            <button onClick={() => setMode("live")}>
+              Open live Credit demo ↗
+            </button>
+          ) : (
+            <a
+              className="button-link"
+              href={journey.source}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Explore Sprinter Liquidity ↗
+            </a>
+          )}
+        </div>
       </section>
       <footer>
-        <span>Sprinter Credit · Developer demo</span>
-        <span>Live transactions use real assets and network gas.</span>
+        <span>↗ sprinter · A playground for possibilities</span>
+        <span>
+          Illustrative scenarios. Live Credit is a separate experience.
+        </span>
       </footer>
     </main>
   );

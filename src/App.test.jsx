@@ -1,121 +1,81 @@
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
-import { request } from "./credit";
-vi.mock("./credit", async (importOriginal) => ({
-  ...(await importOriginal()),
-  request: vi.fn(),
-}));
-const account = "0x0000000000000000000000000000000000000001";
-const collateral = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
-const protocol = {
-  chains: {
-    "eip155:8453": {
-      creditHubs: { usdc: {} },
-      collateral: { [`erc20:${collateral}`]: { symbol: "USDC", ltv: 9000 } },
-      strategies: {},
-    },
-  },
-};
-const response = {
-  calls: [{ chain: "eip155:8453", to: collateral, data: "0x1234", value: "0" }],
-};
-beforeEach(() => {
-  request
-    .mockReset()
-    .mockImplementation(async (path) =>
-      path === "/credit/protocol"
-        ? protocol
-        : path.endsWith("/info")
-          ? {
-              data: {
-                usdc: {
-                  debt: "0",
-                  totalCollateralValue: "0",
-                  remainingCreditCapacity: "0",
-                },
-              },
-            }
-          : response,
-    );
-  delete window.ethereum;
-});
-async function ready() {
+
+afterEach(() => vi.unstubAllGlobals());
+
+test("the default walkthrough never requests wallet access or live API data", async () => {
+  const fetch = vi.fn();
+  const walletRequest = vi.fn();
+  vi.stubGlobal("fetch", fetch);
+  vi.stubGlobal("ethereum", { request: walletRequest });
   render(<App />);
-  await screen.findByRole("option", { name: "Base" });
-  await userEvent.type(screen.getByLabelText("Account address"), account);
-  await screen.findByText("No debt");
-  await userEvent.type(
-    screen.getByLabelText("Amount in base units"),
-    "1000000",
-  );
-}
-test("loads protocol and builds a credit preview without a wallet", async () => {
-  await ready();
   await userEvent.click(
-    screen.getByRole("button", { name: /Build transaction/ }),
+    screen.getByRole("button", { name: /Simulate supplying/ }),
   );
+  await userEvent.click(
+    screen.getByRole("button", { name: /Simulate a transfer/ }),
+  );
+  await userEvent.click(screen.getByRole("button", { name: /See settlement/ }));
   expect(
-    await screen.findByRole("region", { name: "Transaction preview" }),
+    screen.getByRole("heading", { name: "Your capital has a job." }),
   ).toBeInTheDocument();
-  expect(request).toHaveBeenCalledWith(
-    expect.stringContaining("/credit/v2/accounts/"),
-    { amount: "1000000", earnAsset: collateral },
-  );
+  expect(screen.getByText("Fees + yield")).toBeInTheDocument();
+  expect(fetch).not.toHaveBeenCalled();
+  expect(walletRequest).not.toHaveBeenCalled();
   expect(
-    screen.getByRole("button", { name: "Sign and execute in wallet" }),
-  ).toBeDisabled();
-});
-test("invalidates a preview when an input changes", async () => {
-  await ready();
-  await userEvent.click(
-    screen.getByRole("button", { name: /Build transaction/ }),
-  );
-  await screen.findByRole("region", { name: "Transaction preview" });
-  await userEvent.type(screen.getByLabelText("Amount in base units"), "1");
-  expect(
-    screen.queryByRole("region", { name: "Transaction preview" }),
+    screen.queryByRole("button", { name: /Connect wallet/ }),
   ).not.toBeInTheDocument();
 });
-test("discards a late build response after changing action", async () => {
-  await ready();
-  let resolve;
-  request.mockImplementationOnce(
-    () =>
-      new Promise((done) => {
-        resolve = done;
-      }),
-  );
-  await userEvent.click(
-    screen.getByRole("button", { name: /Build transaction/ }),
-  );
-  await userEvent.click(screen.getByRole("button", { name: /Draw credit/ }));
-  resolve(response);
-  await waitFor(() =>
-    expect(screen.getByLabelText("Receiver address")).toBeInTheDocument(),
-  );
-  expect(
-    screen.queryByRole("region", { name: "Transaction preview" }),
-  ).not.toBeInTheDocument();
-});
-test("shows API failures and allows another request", async () => {
-  await ready();
-  request.mockRejectedValueOnce(new Error("Insufficient collateral"));
-  await userEvent.click(
-    screen.getByRole("button", { name: /Build transaction/ }),
-  );
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Insufficient collateral",
-  );
-  expect(
-    screen.getByRole("button", { name: /Build transaction/ }),
-  ).toBeEnabled();
-});
-test("explains missing wallet access", async () => {
+
+test("borrowing changes available credit and repayment clears the example debt", async () => {
   render(<App />);
-  await userEvent.click(screen.getByRole("button", { name: "Connect wallet" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    "Install an Ethereum wallet",
+  await userEvent.click(
+    screen.getByRole("button", { name: /Access spending money/ }),
   );
+  await userEvent.click(
+    screen.getByRole("button", { name: /Simulate pledging/ }),
+  );
+  let outcome = screen.getByRole("region", { name: "Example outcome" });
+  expect(within(outcome).getByText("$7,000")).toBeInTheDocument();
+  await userEvent.click(
+    screen.getByRole("button", { name: /Simulate borrowing/ }),
+  );
+  expect(within(outcome).getByText("$4,000")).toBeInTheDocument();
+  expect(within(outcome).getByText("$3,000")).toBeInTheDocument();
+  await userEvent.click(
+    screen.getByRole("button", { name: /Simulate repayment/ }),
+  );
+  expect(within(outcome).queryByText("$3,000")).not.toBeInTheDocument();
+  expect(
+    within(outcome).getByText("Balance after repayment"),
+  ).toBeInTheDocument();
+});
+
+test("changing the scenario or capital amount restarts the journey", async () => {
+  render(<App />);
+  await userEvent.click(
+    screen.getByRole("button", { name: /Simulate supplying/ }),
+  );
+  await userEvent.click(
+    screen.getByRole("button", { name: /Power a spending app/ }),
+  );
+  expect(
+    screen.getByRole("heading", { name: "A customer brings collateral." }),
+  ).toBeInTheDocument();
+  await userEvent.click(
+    screen.getByRole("button", { name: /Simulate adding/ }),
+  );
+  await userEvent.click(
+    screen.getByRole("button", { name: /Simulate a \$25/ }),
+  );
+  const outcome = screen.getByRole("region", { name: "Example outcome" });
+  expect(within(outcome).getByText("$25")).toBeInTheDocument();
+  fireEvent.change(screen.getByRole("slider"), { target: { value: "20000" } });
+  expect(
+    screen.getByRole("heading", { name: "A customer brings collateral." }),
+  ).toBeInTheDocument();
+  expect(within(outcome).queryByText("$25")).not.toBeInTheDocument();
+  expect(within(outcome).getByText("$20,000")).toBeInTheDocument();
 });

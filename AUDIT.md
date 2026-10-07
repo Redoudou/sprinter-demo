@@ -25,3 +25,9 @@ Scope: make the repository a usable basic demo of Sprinter Credit, based on the 
 ## Remaining manual validation
 
 Use a funded wallet on the configured network to run lock → draw → repay → unlock. Review every wallet prompt. No live signatures or broadcasts were performed during this audit. This repository is an integration demo, not a smart-contract security audit or production lending interface. Advanced operator/auto top-up and standalone earn-vault flows are deferred.
+
+## Product experience follow-up
+
+The default screen is now a visual, persona-based playground instead of an API form. It explains who could use Sprinter and what changes for them through four interactive simulations: liquidity provision, collateral-backed borrowing, credit-backed card spending, and cross-chain operator liquidity. Examples use readable dollar amounts and explicit simulation labels. There are no invented APYs, live LP deposit controls, or claims that the Credit workspace implements Liquidity. The live Credit workspace remains available separately and navigation back is disabled during execution.
+
+Additional regression tests verify simulation isolation from APIs/wallets, example credit/debt arithmetic, and resets when changing the goal or amount. Desktop and mobile layouts and the live-workspace switch are checked in the browser.
