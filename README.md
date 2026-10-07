@@ -15,6 +15,8 @@ An outcome-focused React playground for Sprinter. Start with a goal, adjust an e
 
 These four journeys are explicitly labeled simulations. They never request a wallet, call live APIs, move funds, calculate actual yields, or claim current route availability. Example borrowing uses a fixed 70% limit; actual limits, costs, and supported networks come from the protocol.
 
+![Sprinter Playground preview](./docs/preview.jpg)
+
 **Live Credit demo** opens the original working [Sprinter Credit API](https://docs.sprinter.tech/api-reference/sprinter/credit/overview) workspace: **lock collateral → draw credit → repay debt → unlock collateral**. It is loaded only when requested. Leaving the workspace is disabled during transaction execution.
 
 The Liquidity walkthrough is grounded in [Sprinter Liquidity](https://docs.sprinter.tech/stash-v1/overview), the holder journey in [wallet integration](https://docs.sprinter.tech/quickstart/wallets-integration), the spending journey in [card programs](https://docs.sprinter.tech/quickstart/card-program), and the operator journey in the [Liquidity integration guide](https://docs.sprinter.tech/stash-v1/integration-guide). LP deposits, actual cards, and solver fills are not implemented by the Credit API workspace.
