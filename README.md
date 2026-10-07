@@ -1,5 +1,11 @@
 # Sprinter Playground
 
+[![CI](https://github.com/Redoudou/sprinter-demo/actions/workflows/ci.yml/badge.svg)](https://github.com/Redoudou/sprinter-demo/actions/workflows/ci.yml)
+[![Deploy](https://github.com/Redoudou/sprinter-demo/actions/workflows/deploy.yml/badge.svg)](https://github.com/Redoudou/sprinter-demo/actions/workflows/deploy.yml)
+[![Release](https://img.shields.io/github/v/release/Redoudou/sprinter-demo)](https://github.com/Redoudou/sprinter-demo/releases/latest)
+
+**[Open the deployed playground](https://helloredwan.me/sprinter-demo/)** · [Latest release](https://github.com/Redoudou/sprinter-demo/releases/latest) · [Audit notes](./AUDIT.md)
+
 An outcome-focused React playground for Sprinter. Start with a goal, adjust an example amount, and follow a visual journey:
 
 - **Put liquidity to work:** USDC supply, pooled capital, cross-chain activity, and settlement.
@@ -66,3 +72,9 @@ Protocol configuration provides networks, credit hubs, collateral, LTVs, and ear
 Tests verify that simulations make no network or wallet requests, borrowing and repayment update the example balances, and changes restart the journey. Credit tests cover input validation, exact V2 routes, large integer amounts, API errors, stale previews, wallet changes, chain switching, sequential confirmation, reverted approvals, and timeouts. Live protocol, account-info, and unsigned lock requests were checked during development. No real transaction was signed or broadcast during verification; funded-wallet end-to-end testing remains a manual step.
 
 See [AUDIT.md](./AUDIT.md) for findings and resolution.
+
+## Deployment and releases
+
+GitHub Pages hosts the playground at **https://helloredwan.me/sprinter-demo/**. The deployment workflow runs tests, a dependency audit, and a production build before publishing changes from `main`. It uses `VITE_BASE_PATH=/sprinter-demo/` so assets and the lazy-loaded Credit workspace resolve correctly under the repository path. Local development continues to use `/`.
+
+Releases use tags matching `package.json` and `package-lock.json`. Release assets contain only the compiled website and checksums; GitHub also provides source archives. Do not deploy `node_modules` or `.env` files.
