@@ -1,13 +1,376 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap");
+:root {
+  font-family: "DM Sans", system-ui, sans-serif;
+  color: #19332c;
+  background: #f4f5ef;
+  font-synthesis: none;
+}
+* {
+  box-sizing: border-box;
+}
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+}
+main {
+  max-width: 1080px;
+  margin: auto;
+  padding: 0 32px;
+}
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28px 0;
+  border-bottom: 1px solid #d6ddd2;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+header > a:last-child {
+  font-size: 14px;
+}
+.brand {
+  font-family: "Space Grotesk", sans-serif;
+  display: flex;
+  align-items: center;
+  font-size: 28px;
+  font-weight: 700;
+  gap: 9px;
+}
+.brand-mark {
+  background: #c7ef75;
+  border-radius: 50%;
+  padding: 0 9px;
+}
+.tag {
+  font-family: "DM Sans", sans-serif;
+  font-size: 9px;
+  letter-spacing: 1px;
+  border: 1px solid #a8b5a7;
+  border-radius: 4px;
+  padding: 5px;
+  margin-left: 10px;
+}
+.intro {
+  padding: 58px 0 36px;
+}
+.eyebrow {
+  font-size: 11px !important;
+  letter-spacing: 1.8px;
+  font-weight: 700;
+  color: #527049;
+}
+.intro h1 {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(40px, 6vw, 64px);
+  font-weight: 500;
+  letter-spacing: -3px;
+  line-height: 1.06;
+  margin: 18px 0;
+}
+.intro > p:last-child {
+  line-height: 1.7;
+  color: #68776b;
+  font-size: 16px;
+}
+.panel {
+  background: #fff;
+  border: 1px solid #dce3d6;
+  border-radius: 16px;
+  padding: 28px;
+  margin: 20px 0;
+}
+.account-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+h2 {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 21px;
+  font-weight: 500;
+  margin: 0 0 6px;
+}
+p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #657367;
+  margin: 6px 0 16px;
+}
+button,
+input,
+select {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+  background: #193b30;
+  color: #fff;
+  border: 0;
+  border-radius: 7px;
+  padding: 12px 18px;
+  font-size: 13px;
+  font-weight: 600;
+}
+button:hover:not(:disabled) {
+  filter: brightness(1.15);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible {
+  outline: 3px solid #73a12c;
+  outline-offset: 3px;
+}
+input,
+select {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d3dcd0;
+  background: #fafbf7;
+  border-radius: 7px;
+  color: #19332c;
+  font-size: 14px;
+  margin-top: 8px;
+}
+input:focus,
+select:focus {
+  outline: 2px solid #91b954;
+  outline-offset: 1px;
+}
+label {
+  font-size: 12px;
+  font-weight: 600;
+  display: block;
+}
+.wide {
+  width: 100%;
+}
+.selectors {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  width: 100%;
+}
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+.subtle {
+  background: transparent;
+  border: 1px solid #c4cebc;
+  color: #264934;
+  padding: 8px 14px;
+}
+.position {
+  margin: 32px 0;
+}
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.metric {
+  background: #e9eddf;
+  border-radius: 12px;
+  padding: 22px 18px;
+  min-width: 0;
+}
+.metric span {
+  font-size: 11px;
+  color: #596957;
+}
+.metric strong {
+  display: block;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 26px;
+  font-weight: 500;
+  margin: 16px 0 8px;
+  overflow-wrap: anywhere;
+}
+.metric small {
+  color: #73816b;
+  font-size: 10px;
+}
+details {
+  margin-top: 18px;
+  font-size: 13px;
+}
+summary {
+  cursor: pointer;
+}
+dl {
+  display: grid;
+  grid-template-columns: minmax(100px, 1fr) 2fr;
+  gap: 9px;
+  font-size: 12px;
+}
+dt {
+  color: #6e7b68;
+}
+dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.live-dot {
+  font-size: 11px;
+  background: #eef5e4;
+  padding: 7px 12px;
+  border-radius: 30px;
+  white-space: nowrap;
+}
+.live-dot:before {
+  content: "●";
+  color: #72a52e;
+  margin-right: 7px;
+}
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-bottom: 1px solid #dce3d6;
+  margin-bottom: 24px;
+  gap: 8px;
+}
+.tabs button {
+  border-radius: 0;
+  background: transparent;
+  color: #6e7b68;
+  padding: 14px 4px;
+  border-bottom: 2px solid transparent;
+}
+.tabs button span {
+  font-size: 10px;
+  display: block;
+  margin-bottom: 7px;
+}
+.tabs .active {
+  border-color: #2b5039;
+  color: #19332c;
+}
+.action-panel form > p {
+  margin-bottom: 22px;
+}
+fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 20px;
+}
+label small {
+  display: block;
+  color: #74806d;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.6;
+  margin-top: 8px;
+}
+.primary {
+  background: #c7ef75;
+  color: #19332c;
+  padding: 15px 20px;
+  width: 100%;
+  font-size: 14px;
+}
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.checkbox input {
+  width: auto;
+  margin: 0;
+}
+.message {
+  padding: 14px;
+  background: #edf3e7;
+  border-radius: 8px;
+  margin-top: 20px;
+  overflow-wrap: anywhere;
+}
+.error {
+  background: #fff1ed;
+  color: #954c39;
+}
+.preview {
+  border-top: 1px solid #dce3d6;
+  margin-top: 26px;
+  padding-top: 12px;
+}
+.preview ol {
+  padding-left: 22px;
+}
+.preview li {
+  padding: 14px 0;
+}
+.preview code {
+  overflow-wrap: anywhere;
+  font-size: 11px;
+}
+footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px 0 36px;
+  font-size: 11px;
+  color: #78836e;
+}
+@media (max-width: 640px) {
+  main {
+    padding: 0 18px;
+  }
+  header {
+    gap: 12px;
+    align-items: flex-start;
+  }
+  header > a:last-child {
+    font-size: 11px;
+  }
+  .brand {
+    font-size: 23px;
+  }
+  .tag {
+    display: none;
+  }
+  .intro {
+    padding-top: 34px;
+  }
+  .intro h1 {
+    letter-spacing: -2px;
+  }
+  .panel {
+    padding: 20px;
+  }
+  .metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+  .metric strong {
+    font-size: 22px;
+  }
+  .tabs button {
+    font-size: 11px;
+  }
+  .selectors {
+    grid-template-columns: 1fr;
+  }
+  footer {
+    flex-direction: column;
+  }
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+.history {
+  overflow-wrap: anywhere;
+}
+.history code {
+  font-size: 11px;
 }
